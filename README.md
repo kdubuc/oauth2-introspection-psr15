@@ -12,7 +12,15 @@ $ composer require kdubuc/oauth2-introspection-psr15
 
 ## Usage
 
+```php
+$middleware =  new Oauth2Introspection($http_psr18_client, $http_stream_psr17_factory, $http_request_psr17_factory, [
+    'introspection_endpoint' => 'http://oauth2.example.com/introspect',
+    'oauth2_client_id'       => 'client_id',
+    'oauth2_client_secret'   => 'client_secret',
+]);
 
+// Introspection results will be stored into 'oauth2_access_token_introspection_data' request attribute
+```
 
 ## Testing
 
