@@ -2,8 +2,6 @@
 
 namespace Kdubuc\Middleware;
 
-use Exception;
-use Assert\Assert;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -45,10 +43,17 @@ final class Oauth2Introspection implements MiddlewareInterface
         $oauth2_client_id       = $this->oauth2_config['oauth2_client_id'];
         $oauth2_client_secret   = $this->oauth2_config['oauth2_client_secret'];
 
+        // Retrieve an array of all the Authorization header values
+        $authorization_headers = $server_request->getHeader('Authorization');
+        if (!\is_array($authorization_headers) || 0 === \count($authorization_headers)) {
+            throw new Oauth2IntrospectionException('No Authorization header provided');
+        }
+
         // Get access_token in the server request's Authorization header.
-        Assert::that($authorization_headers = $server_request->getHeader('Authorization'), 'No Authorization header provided')->isArray()->notEmpty();
         $access_token = trim(preg_replace('/^(?:\s+)?Bearer\s?/', '', array_shift($authorization_headers)));
-        Assert::that($access_token, 'No access token found')->notEmpty()->string();
+        if (empty($access_token)) {
+            throw new Oauth2IntrospectionException('No access token found');
+        }
 
         // Build HTTP introspection request.
         $introspection_request = $this->http_request_factory->createRequest('POST', $introspection_endpoint);
@@ -67,7 +72,7 @@ final class Oauth2Introspection implements MiddlewareInterface
         // will generally indicate that a given token has been issued by this authorization server, has not been revoked
         // by the resource owner, and is within its given time window of validity (https://tools.ietf.org/html/rfc7662#section-2.2)
         if (true !== $introspection_data['active']) {
-            throw new Exception('The resource owner or authorization server denied the request.');
+            throw new Oauth2IntrospectionException('The resource owner or authorization server denied the request.');
         }
 
         // Store introspection results data

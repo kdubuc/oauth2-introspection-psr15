@@ -7,6 +7,7 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Kdubuc\Middleware\Oauth2Introspection;
 use Psr\Http\Server\RequestHandlerInterface;
+use Kdubuc\Middleware\Oauth2IntrospectionException;
 
 class Oauth2IntrospectionTest extends TestCase
 {
@@ -18,7 +19,7 @@ class Oauth2IntrospectionTest extends TestCase
 
     public function testExceptionThrownWhenNoAuthorizationHeader()
     {
-        $this->expectException(\Assert\InvalidArgumentException::class);
+        $this->expectException(Oauth2IntrospectionException::class);
 
         $http_factory     = new HttpFactory();
         $http_client_stub = $this->createStub(ClientInterface::class);
@@ -32,7 +33,7 @@ class Oauth2IntrospectionTest extends TestCase
 
     public function testExceptionThrownWhenNoAccessTokenPresent()
     {
-        $this->expectException(\Assert\InvalidArgumentException::class);
+        $this->expectException(Oauth2IntrospectionException::class);
 
         $http_factory     = new HttpFactory();
         $http_client_stub = $this->createStub(ClientInterface::class);
