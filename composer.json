@@ -1,0 +1,42 @@
+{
+    "name": "kdubuc/oauth2-introspection-psr15",
+    "description": "PSR15 OAuth2 Introspection Middleware",
+    "keywords": [
+      "psr15",
+      "psr7",
+      "oauth2",
+      "openid",
+      "introspection",
+      "rfc7662"
+    ],
+    "homepage": "https://github.com/kdubuc/oauth2-introspection-psr15",
+    "license": "CECILL-2.1",
+    "authors": [
+      {
+        "role": "Developer",
+        "name": "Kevin DUBUC",
+        "email": "kevindubuc62@gmail.com",
+        "homepage": "http://kevindubuc.fr"
+      }
+    ],
+    "require": {
+      "php": "^7.1",
+      "psr/http-message": "^1.0",
+      "psr/http-server-middleware": "^1.0",
+      "psr/http-client": "^1.0",
+      "psr/http-factory": "^1.0",
+      "beberlei/assert": "^3.0"
+    },
+    "require-dev": {
+      "kdubuc/php-cs-fixer-rules": "^1.0",
+      "guzzlehttp/psr7": "2.0.0-beta1",
+      "phpunit/phpunit": "^9.0"
+    },
+    "autoload": {
+      "psr-4": {
+        "Kdubuc\\Middleware\\": "src/"
+      }
+    },
+    "prefer-stable": true,
+    "minimum-stability": "dev"
+  }
