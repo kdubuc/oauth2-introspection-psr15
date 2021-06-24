@@ -2,6 +2,8 @@
 
 Protect your API with OAuth 2.0 Token Introspection [RFC 7662](https://tools.ietf.org/html/rfc7662).
 
+[PSR-6](https://www.php-fig.org/psr/psr-6/) can be used to store introspection data during its lifetime (if expiration timestamp of the token is specified by introspection endpoint).
+
 ## Install
 
 Via Composer
@@ -18,6 +20,8 @@ $middleware =  new Oauth2Introspection($http_psr18_client, $http_stream_psr17_fa
     'oauth2_client_id'       => 'client_id',
     'oauth2_client_secret'   => 'client_secret',
 ]);
+
+$middleware->enableCache($psr6_cache);
 
 // Introspection results will be stored into 'oauth2_access_token_introspection_data' request attribute
 ```
