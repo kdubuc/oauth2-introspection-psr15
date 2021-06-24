@@ -7,8 +7,8 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Kdubuc\Middleware\Oauth2Introspection;
 use Psr\Http\Server\RequestHandlerInterface;
-use Kdubuc\Middleware\Oauth2IntrospectionException;
 use WildWolf\Psr6MemoryCache as Psr6CacheTest;
+use Kdubuc\Middleware\Oauth2IntrospectionException;
 
 class Oauth2IntrospectionTest extends TestCase
 {
@@ -75,7 +75,7 @@ class Oauth2IntrospectionTest extends TestCase
     public function testIntrospectionRequestWithCache()
     {
         $access_token = 'xxxx';
-        $expires_at = '1687594342'; // Expires at 24/6/2023
+        $expires_at   = '1687594342'; // Expires at 24/6/2023
 
         $http_factory = new HttpFactory();
 
