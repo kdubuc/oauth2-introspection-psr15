@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 use Kdubuc\Middleware\Oauth2Introspection;
 use Psr\Http\Server\RequestHandlerInterface;
 use Kdubuc\Middleware\Oauth2IntrospectionException;
+use WildWolf\Psr6MemoryCache as Psr6CacheTest;
 
 class Oauth2IntrospectionTest extends TestCase
 {
@@ -69,5 +70,38 @@ class Oauth2IntrospectionTest extends TestCase
         $response = $middleware->process($server_request, $handler_stub);
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
+    }
+
+    public function testIntrospectionRequestWithCache()
+    {
+        $access_token = 'xxxx';
+        $expires_at = '1687594342'; // Expires at 24/6/2023
+
+        $http_factory = new HttpFactory();
+
+        $introspection_response = $http_factory->createResponse(200);
+        $introspection_response = $introspection_response->withHeader('Content-Type', 'application/json');
+        $introspection_response = $introspection_response->withBody($http_factory->createStream(json_encode(['active' => true, 'exp' => $expires_at])));
+
+        $http_client_stub = $this->createStub(ClientInterface::class);
+        $http_client_stub->method('sendRequest')->willReturn($introspection_response);
+
+        $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
+        $server_request = $server_request->withHeader('Authorization', "Bearer $access_token");
+
+        $handler_stub = $this->createStub(RequestHandlerInterface::class);
+        $handler_stub->method('handle')->willReturn(new Response());
+
+        $middleware = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
+
+        $cache = new Psr6CacheTest();
+        $middleware->enableCache($cache);
+
+        $this->assertFalse($cache->getItem(sprintf(Oauth2Introspection::CACHE_KEY_FORMAT, $access_token))->isHit());
+
+        $response = $middleware->process($server_request, $handler_stub);
+        $this->assertInstanceOf(ResponseInterface::class, $response);
+
+        $this->assertTrue($cache->getItem(sprintf(Oauth2Introspection::CACHE_KEY_FORMAT, $access_token))->isHit());
     }
 }

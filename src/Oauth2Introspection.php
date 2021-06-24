@@ -3,6 +3,7 @@
 namespace Kdubuc\Middleware;
 
 use Psr\Http\Client\ClientInterface;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -17,6 +18,9 @@ use Psr\Http\Message\RequestFactoryInterface;
 final class Oauth2Introspection implements MiddlewareInterface
 {
     public const INTROSPECTION_DATA_ATTRIBUTE_NAME = 'oauth2_access_token_introspection_data';
+    public const CACHE_KEY_FORMAT                  = 'at_%s';
+
+    private ?CacheItemPoolInterface $cache_pool = null;
 
     /**
      * Configure OAuth2 Introspection endpoint.
@@ -55,17 +59,33 @@ final class Oauth2Introspection implements MiddlewareInterface
             throw new Oauth2IntrospectionException('No access token found');
         }
 
-        // Build HTTP introspection request.
-        $introspection_request = $this->http_request_factory->createRequest('POST', $introspection_endpoint);
-        $introspection_request = $introspection_request->withHeader('Content-Type', 'application/x-www-form-urlencoded');
-        $introspection_request = $introspection_request->withHeader('Authorization', 'Basic '.base64_encode("$oauth2_client_id:$oauth2_client_secret"));
-        $introspection_request = $introspection_request->withBody($this->http_stream_factory->createStream(http_build_query(['token' => $access_token, 'token_type_hint' => 'access_token'], '', '&')));
+        // Request the access_token introspection data in cache (if enabled, otherwise, cache_item will be null)
+        $cache_key  = sprintf(self::CACHE_KEY_FORMAT, $access_token);
+        $cache_item = null !== $this->cache_pool ? $this->cache_pool->getItem($cache_key) : null;
 
-        // Talk to introspection endpoint
-        $introspection_response = $this->http_client->sendRequest($introspection_request);
+        // If the cache is not enabled, or access_token is not found in cache, we must talk with the introspection endpoint
+        if (null === $cache_item || !$cache_item->isHit()) {
+            // Build HTTP introspection request.
+            $introspection_request = $this->http_request_factory->createRequest('POST', $introspection_endpoint);
+            $introspection_request = $introspection_request->withHeader('Content-Type', 'application/x-www-form-urlencoded');
+            $introspection_request = $introspection_request->withHeader('Authorization', 'Basic '.base64_encode("$oauth2_client_id:$oauth2_client_secret"));
+            $introspection_request = $introspection_request->withBody($this->http_stream_factory->createStream(http_build_query(['token' => $access_token, 'token_type_hint' => 'access_token'], '', '&')));
 
-        // Parse the introspection results
-        $introspection_data = json_decode(trim((string) $introspection_response->getBody()), true, 512, \JSON_THROW_ON_ERROR);
+            // Talk to introspection endpoint
+            $introspection_response = $this->http_client->sendRequest($introspection_request);
+
+            // Parse the introspection results
+            $introspection_data = json_decode(trim((string) $introspection_response->getBody()), true, 512, \JSON_THROW_ON_ERROR);
+
+            // Save introspection results into the cache pool (if enabled, and expiration timestamp of the token exists in introspection data)
+            if (null !== $this->cache_pool && \array_key_exists('exp', $introspection_data)) {
+                $cache_item->set(json_encode($introspection_data, \JSON_THROW_ON_ERROR));
+                $cache_item->expiresAfter((int) $introspection_data['exp'] - time());
+                $this->cache_pool->save($cache_item);
+            }
+        } else {
+            $introspection_data = json_decode($cache_item->get(), true, 512, \JSON_THROW_ON_ERROR);
+        }
 
         // The specifics of a token's "active" state will vary depending on the implementation of the authorization
         // server and the information it keeps about its tokens, but a "true" value return for the "active" property
@@ -80,5 +100,13 @@ final class Oauth2Introspection implements MiddlewareInterface
 
         // Continue to process server request
         return $handler->handle($server_request);
+    }
+
+    /**
+     * Enable cache pool to store introspection data.
+     */
+    public function enableCache(CacheItemPoolInterface $pool) : void
+    {
+        $this->cache_pool = $pool;
     }
 }
