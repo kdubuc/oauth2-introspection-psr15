@@ -18,6 +18,8 @@ class Oauth2IntrospectionTest extends TestCase
         'oauth2_client_secret'   => 'client_secret',
     ];
 
+    public const JWT_TEST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+
     public function testExceptionThrownWhenNoAuthorizationHeader()
     {
         $this->expectException(Oauth2IntrospectionException::class);
@@ -28,6 +30,21 @@ class Oauth2IntrospectionTest extends TestCase
         $middleware       = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
 
         $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
+
+        $middleware->process($server_request, $handler_stub);
+    }
+
+    public function testExceptionThrownWhenAccessTokenIsMalformed()
+    {
+        $this->expectException(Oauth2IntrospectionException::class);
+
+        $http_factory     = new HttpFactory();
+        $http_client_stub = $this->createStub(ClientInterface::class);
+        $handler_stub     = $this->createStub(RequestHandlerInterface::class);
+        $middleware       = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
+
+        $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
+        $server_request = $server_request->withHeader('Authorization', 'Bearer foo');
 
         $middleware->process($server_request, $handler_stub);
     }
@@ -59,7 +76,7 @@ class Oauth2IntrospectionTest extends TestCase
         $http_client_stub->method('sendRequest')->willReturn($introspection_response);
 
         $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
-        $server_request = $server_request->withHeader('Authorization', 'Bearer xxxx');
+        $server_request = $server_request->withHeader('Authorization', 'Bearer '.self::JWT_TEST);
 
         $handler_stub                           = $this->createStub(RequestHandlerInterface::class);
         $server_request_with_introspection_data = $server_request->withAttribute(Oauth2Introspection::INTROSPECTION_DATA_ATTRIBUTE_NAME, ['active' => true, 'foo' => 'bar']);
@@ -74,7 +91,7 @@ class Oauth2IntrospectionTest extends TestCase
 
     public function testIntrospectionRequestWithCache()
     {
-        $access_token = 'xxxx';
+        $access_token = self::JWT_TEST;
         $expires_at   = '1687594342'; // Expires at 24/6/2023
 
         $http_factory = new HttpFactory();

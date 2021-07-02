@@ -19,6 +19,7 @@ final class Oauth2Introspection implements MiddlewareInterface
 {
     public const INTROSPECTION_DATA_ATTRIBUTE_NAME = 'oauth2_access_token_introspection_data';
     public const CACHE_KEY_FORMAT                  = 'at_%s';
+    public const JWT_REGEX                         = '/^[a-zA-Z0-9\-_]+?\.[a-zA-Z0-9\-_]+?\.(?:[a-zA-Z0-9\-_]+)?$/';
 
     private ?CacheItemPoolInterface $cache_pool = null;
 
@@ -57,6 +58,12 @@ final class Oauth2Introspection implements MiddlewareInterface
         $access_token = trim(preg_replace('/^(?:\s+)?Bearer\s?/', '', array_shift($authorization_headers)));
         if (empty($access_token)) {
             throw new Oauth2IntrospectionException('No access token found');
+        }
+
+        // If access token is malformed, throw an Exception
+        preg_match(self::JWT_REGEX, $access_token, $matches);
+        if (empty($matches) || $matches[0] !== $access_token) {
+            throw new Oauth2IntrospectionException('Access token is malformed');
         }
 
         // Request the access_token introspection data in cache (if enabled, otherwise, cache_item will be null)
