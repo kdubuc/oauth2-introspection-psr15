@@ -51,19 +51,19 @@ final class Oauth2Introspection implements MiddlewareInterface
         // Retrieve an array of all the Authorization header values
         $authorization_headers = $server_request->getHeader('Authorization');
         if (!\is_array($authorization_headers) || 0 === \count($authorization_headers)) {
-            throw new Oauth2IntrospectionException('No Authorization header provided');
+            throw new Oauth2IntrospectionException('No Authorization header provided', Oauth2IntrospectionException::AUTHORIZATION_HEADER_NOT_FOUND);
         }
 
         // Get access_token in the server request's Authorization header.
         $access_token = trim(preg_replace('/^(?:\s+)?Bearer\s?/', '', array_shift($authorization_headers)));
         if (empty($access_token)) {
-            throw new Oauth2IntrospectionException('No access token found');
+            throw new Oauth2IntrospectionException('No access token found', Oauth2IntrospectionException::ACCESS_TOKEN_EMPTY);
         }
 
         // If access token is malformed, throw an Exception
         preg_match(self::JWT_REGEX, $access_token, $matches);
         if (empty($matches) || $matches[0] !== $access_token) {
-            throw new Oauth2IntrospectionException('Access token is malformed');
+            throw new Oauth2IntrospectionException('Access token is malformed', Oauth2IntrospectionException::ACCESS_TOKEN_INVALID);
         }
 
         // Request the access_token introspection data in cache (if enabled, otherwise, cache_item will be null)
@@ -80,6 +80,11 @@ final class Oauth2Introspection implements MiddlewareInterface
 
             // Talk to introspection endpoint
             $introspection_response = $this->http_client->sendRequest($introspection_request);
+
+            // If status code is not 200 - OK, throw an exception
+            if (200 !== $introspection_response->getStatusCode()) {
+                throw new Oauth2IntrospectionException('Authorization server encountered an error', Oauth2IntrospectionException::AUTHORIZATION_SERVER_ERROR);
+            }
 
             // Parse the introspection results
             $introspection_data = json_decode(trim((string) $introspection_response->getBody()), true, 512, \JSON_THROW_ON_ERROR);
@@ -99,7 +104,7 @@ final class Oauth2Introspection implements MiddlewareInterface
         // will generally indicate that a given token has been issued by this authorization server, has not been revoked
         // by the resource owner, and is within its given time window of validity (https://tools.ietf.org/html/rfc7662#section-2.2)
         if (true !== $introspection_data['active']) {
-            throw new Oauth2IntrospectionException('The resource owner or authorization server denied the request.');
+            throw new Oauth2IntrospectionException('The resource owner or authorization server denied the request', Oauth2IntrospectionException::ACCESS_TOKEN_INACTIVE);
         }
 
         // Store introspection results data

@@ -23,6 +23,7 @@ class Oauth2IntrospectionTest extends TestCase
     public function testExceptionThrownWhenNoAuthorizationHeader()
     {
         $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::AUTHORIZATION_HEADER_NOT_FOUND);
 
         $http_factory     = new HttpFactory();
         $http_client_stub = $this->createStub(ClientInterface::class);
@@ -37,6 +38,7 @@ class Oauth2IntrospectionTest extends TestCase
     public function testExceptionThrownWhenAccessTokenIsMalformed()
     {
         $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::ACCESS_TOKEN_INVALID);
 
         $http_factory     = new HttpFactory();
         $http_client_stub = $this->createStub(ClientInterface::class);
@@ -52,6 +54,7 @@ class Oauth2IntrospectionTest extends TestCase
     public function testExceptionThrownWhenNoAccessTokenPresent()
     {
         $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::ACCESS_TOKEN_EMPTY);
 
         $http_factory     = new HttpFactory();
         $http_client_stub = $this->createStub(ClientInterface::class);
@@ -60,6 +63,49 @@ class Oauth2IntrospectionTest extends TestCase
 
         $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
         $server_request = $server_request->withHeader('Authorization', 'Bearer');
+
+        $middleware->process($server_request, $handler_stub);
+    }
+
+    public function testExceptionThrownWhenAccessTokenInactive()
+    {
+        $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::ACCESS_TOKEN_INACTIVE);
+
+        $http_factory = new HttpFactory();
+
+        $http_client_stub       = $this->createStub(ClientInterface::class);
+        $introspection_response = $http_factory->createResponse(200);
+        $introspection_response = $introspection_response->withHeader('Content-Type', 'application/json');
+        $introspection_response = $introspection_response->withBody($http_factory->createStream(json_encode(['active' => false])));
+        $http_client_stub->method('sendRequest')->willReturn($introspection_response);
+
+        $handler_stub = $this->createStub(RequestHandlerInterface::class);
+
+        $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
+        $server_request = $server_request->withHeader('Authorization', 'Bearer '.self::JWT_TEST);
+
+        $middleware = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
+
+        $middleware->process($server_request, $handler_stub);
+    }
+
+    public function testExceptionThrownWhenAuthorizationServerError()
+    {
+        $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::AUTHORIZATION_SERVER_ERROR);
+
+        $http_factory = new HttpFactory();
+
+        $http_client_stub = $this->createStub(ClientInterface::class);
+        $http_client_stub->method('sendRequest')->willReturn($http_factory->createResponse(500));
+
+        $handler_stub = $this->createStub(RequestHandlerInterface::class);
+
+        $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
+        $server_request = $server_request->withHeader('Authorization', 'Bearer '.self::JWT_TEST);
+
+        $middleware = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
 
         $middleware->process($server_request, $handler_stub);
     }
