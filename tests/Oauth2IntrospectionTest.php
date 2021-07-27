@@ -110,6 +110,19 @@ class Oauth2IntrospectionTest extends TestCase
         $middleware->process($server_request, $handler_stub);
     }
 
+    public function testExceptionThrownWhenTokenTypeHintUnknown()
+    {
+        $this->expectException(Oauth2IntrospectionException::class);
+        $this->expectExceptionCode(Oauth2IntrospectionException::TOKEN_TYPE_HINT_UNKNOWN);
+
+        $http_factory     = new HttpFactory();
+        $http_client_stub = $this->createStub(ClientInterface::class);
+
+        $middleware = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
+
+        $middleware->setTokenHint('foo');
+    }
+
     public function testIntrospectionRequest()
     {
         $http_factory = new HttpFactory();

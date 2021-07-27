@@ -26,6 +26,7 @@ final class Oauth2Introspection implements MiddlewareInterface
     private RequestFactoryInterface $http_request_factory;
     private ?CacheItemPoolInterface $cache_pool = null;
     private array $oauth2_config;
+    private ?string $token_type_hint = null;
 
     /**
      * Configure OAuth2 Introspection endpoint.
@@ -76,11 +77,19 @@ final class Oauth2Introspection implements MiddlewareInterface
 
         // If the cache is not enabled, or access_token is not found in cache, we must talk with the introspection endpoint
         if (null === $cache_item || !$cache_item->isHit()) {
+            // Set up introspection request parameters.
+            $introspection_parameters = ['token' => $access_token];
+
+            // If token type hint is defined, add it to the parameters
+            if (null !== $this->token_type_hint) {
+                $introspection_parameters['token_type_hint'] = $this->token_type_hint;
+            }
+
             // Build HTTP introspection request.
             $introspection_request = $this->http_request_factory->createRequest('POST', $introspection_endpoint);
             $introspection_request = $introspection_request->withHeader('Content-Type', 'application/x-www-form-urlencoded');
             $introspection_request = $introspection_request->withHeader('Authorization', 'Basic '.base64_encode("$oauth2_client_id:$oauth2_client_secret"));
-            $introspection_request = $introspection_request->withBody($this->http_stream_factory->createStream(http_build_query(['token' => $access_token, 'token_type_hint' => 'access_token'], '', '&')));
+            $introspection_request = $introspection_request->withBody($this->http_stream_factory->createStream(http_build_query($introspection_parameters, '', '&')));
 
             // Talk to introspection endpoint
             $introspection_response = $this->http_client->sendRequest($introspection_request);
@@ -124,5 +133,18 @@ final class Oauth2Introspection implements MiddlewareInterface
     public function enableCache(CacheItemPoolInterface $pool) : void
     {
         $this->cache_pool = $pool;
+    }
+
+    /**
+     * A hint about the type of the token submitted for introspection to help the authorization server optimize the token lookup.
+     */
+    public function setTokenHint(string $token_type_hint) : void
+    {
+        // Values for this property are defined in the "OAuth Token Type Hints" registry defined in OAuth Token Revocation (https://tools.ietf.org/html/rfc7009#section-2.1)
+        if (!\in_array($token_type_hint, ['access_token', 'refresh_token'])) {
+            throw new Oauth2IntrospectionException("Token type hint $token_type_hint not defined in RFC7009 OAuth Token Revocation", Oauth2IntrospectionException::TOKEN_TYPE_HINT_UNKNOWN);
+        }
+
+        $this->token_type_hint = $token_type_hint;
     }
 }
