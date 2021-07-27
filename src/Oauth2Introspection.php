@@ -21,7 +21,11 @@ final class Oauth2Introspection implements MiddlewareInterface
     public const CACHE_KEY_FORMAT                  = 'at_%s';
     public const JWT_REGEX                         = '/^[a-zA-Z0-9\-_]+?\.[a-zA-Z0-9\-_]+?\.(?:[a-zA-Z0-9\-_]+)?$/';
 
+    private ClientInterface $http_client;
+    private StreamFactoryInterface $http_stream_factory;
+    private RequestFactoryInterface $http_request_factory;
     private ?CacheItemPoolInterface $cache_pool = null;
+    private array $oauth2_config;
 
     /**
      * Configure OAuth2 Introspection endpoint.
