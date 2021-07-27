@@ -4,6 +4,7 @@ use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 use GuzzleHttp\Psr7\HttpFactory;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Kdubuc\Middleware\Oauth2Introspection;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -132,7 +133,12 @@ class Oauth2IntrospectionTest extends TestCase
         $introspection_response = $introspection_response->withBody($http_factory->createStream(json_encode(['active' => true, 'foo' => 'bar'])));
 
         $http_client_stub = $this->createStub(ClientInterface::class);
-        $http_client_stub->method('sendRequest')->willReturn($introspection_response);
+        $http_client_stub->method('sendRequest')->willReturn($introspection_response)->with($this->callback(function (RequestInterface $request) : bool {
+            return (string) $request->getUri() === self::OAUTH2_CONFIG_EXAMPLE['introspection_endpoint']
+                && 'application/x-www-form-urlencoded' === $request->getHeaderLine('Content-Type')
+                && 'Basic '.base64_encode(self::OAUTH2_CONFIG_EXAMPLE['oauth2_client_id'].':'.self::OAUTH2_CONFIG_EXAMPLE['oauth2_client_secret']) === $request->getHeaderLine('Authorization')
+                && parse_url($request->getBody()->getContents(), \PHP_URL_PATH) === 'token='.self::JWT_TEST.'&token_type_hint=refresh_token';
+        }));
 
         $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
         $server_request = $server_request->withHeader('Authorization', 'Bearer '.self::JWT_TEST);
@@ -142,6 +148,8 @@ class Oauth2IntrospectionTest extends TestCase
         $handler_stub->method('handle')->with($server_request_with_introspection_data)->willReturn(new Response());
 
         $middleware = new Oauth2Introspection($http_client_stub, $http_factory, $http_factory, self::OAUTH2_CONFIG_EXAMPLE);
+
+        $middleware->setTokenHint('refresh_token');
 
         $response = $middleware->process($server_request, $handler_stub);
 
@@ -160,7 +168,12 @@ class Oauth2IntrospectionTest extends TestCase
         $introspection_response = $introspection_response->withBody($http_factory->createStream(json_encode(['active' => true, 'exp' => $expires_at])));
 
         $http_client_stub = $this->createStub(ClientInterface::class);
-        $http_client_stub->method('sendRequest')->willReturn($introspection_response);
+        $http_client_stub->method('sendRequest')->willReturn($introspection_response)->with($this->callback(function (RequestInterface $request) : bool {
+            return (string) $request->getUri() === self::OAUTH2_CONFIG_EXAMPLE['introspection_endpoint']
+                && 'application/x-www-form-urlencoded' === $request->getHeaderLine('Content-Type')
+                && 'Basic '.base64_encode(self::OAUTH2_CONFIG_EXAMPLE['oauth2_client_id'].':'.self::OAUTH2_CONFIG_EXAMPLE['oauth2_client_secret']) === $request->getHeaderLine('Authorization')
+                && parse_url($request->getBody()->getContents(), \PHP_URL_PATH) === 'token='.self::JWT_TEST;
+        }));
 
         $server_request = $http_factory->createServerRequest('GET', 'http://example.com/userinfo');
         $server_request = $server_request->withHeader('Authorization', "Bearer $access_token");
