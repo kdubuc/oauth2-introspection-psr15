@@ -37,10 +37,13 @@ final class Oauth2Introspection implements MiddlewareInterface
         RequestFactoryInterface $http_request_factory,
         array $oauth2_config
     ) {
-        $this->oauth2_config        = $oauth2_config;
+        // Set interoperable HTTP standards and interfaces (PSR-17, 18)
         $this->http_client          = $http_client;
         $this->http_request_factory = $http_request_factory;
         $this->http_stream_factory  = $http_stream_factory;
+
+        // OAuth2 configuration.
+        $this->oauth2_config = $oauth2_config;
     }
 
     /**
@@ -48,11 +51,6 @@ final class Oauth2Introspection implements MiddlewareInterface
      */
     public function process(ServerRequestInterface $server_request, RequestHandlerInterface $handler) : ResponseInterface
     {
-        // Export OAuth2 config
-        $introspection_endpoint = $this->oauth2_config['introspection_endpoint'];
-        $oauth2_client_id       = $this->oauth2_config['oauth2_client_id'];
-        $oauth2_client_secret   = $this->oauth2_config['oauth2_client_secret'];
-
         // Retrieve an array of all the Authorization header values
         $authorization_headers = $server_request->getHeader('Authorization');
         if (!\is_array($authorization_headers) || 0 === \count($authorization_headers)) {
@@ -86,10 +84,15 @@ final class Oauth2Introspection implements MiddlewareInterface
             }
 
             // Build HTTP introspection request.
-            $introspection_request = $this->http_request_factory->createRequest('POST', $introspection_endpoint);
+            $introspection_request = $this->http_request_factory->createRequest('POST', $this->oauth2_config['introspection_endpoint']);
             $introspection_request = $introspection_request->withHeader('Content-Type', 'application/x-www-form-urlencoded');
-            $introspection_request = $introspection_request->withHeader('Authorization', 'Basic '.base64_encode("$oauth2_client_id:$oauth2_client_secret"));
             $introspection_request = $introspection_request->withBody($this->http_stream_factory->createStream(http_build_query($introspection_parameters, '', '&')));
+
+            // To prevent token scanning attacks, introspection endpoint require some form of authorization
+            // Most introspection authentication methods require the client_id and client_secret to be included in the Authorization header as a Basic auth base64-encoded string with the request.
+            $oauth2_client_id      = $this->oauth2_config['oauth2_client_id'];
+            $oauth2_client_secret  = $this->oauth2_config['oauth2_client_secret'];
+            $introspection_request = $introspection_request->withHeader('Authorization', 'Basic '.base64_encode("$oauth2_client_id:$oauth2_client_secret"));
 
             // Talk to introspection endpoint
             $introspection_response = $this->http_client->sendRequest($introspection_request);
