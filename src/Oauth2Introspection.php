@@ -43,7 +43,9 @@ final class Oauth2Introspection implements MiddlewareInterface
         $this->http_stream_factory  = $http_stream_factory;
 
         // OAuth2 configuration.
-        $this->oauth2_config = $oauth2_config;
+        $this->oauth2_config['introspection_endpoint'] = $oauth2_config['introspection_endpoint'] ?? '';
+        $this->oauth2_config['oauth2_client_id']       = $oauth2_config['oauth2_client_id'] ?? '';
+        $this->oauth2_config['oauth2_client_secret']   = $oauth2_config['oauth2_client_secret'] ?? '';
     }
 
     /**
